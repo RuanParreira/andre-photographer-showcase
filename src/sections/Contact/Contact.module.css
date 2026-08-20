@@ -1,0 +1,72 @@
+.contact {
+  position: relative;
+  padding: var(--section-gap) var(--edge) clamp(40px, 5vw, 64px);
+  display: flex;
+  flex-direction: column;
+  gap: clamp(56px, 8vw, 96px);
+}
+
+.kicker {
+  font-size: 12px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: clamp(18px, 3vw, 30px);
+}
+
+.heading {
+  font-size: clamp(44px, 8vw, 120px);
+  font-weight: 500;
+  line-height: 1;
+  overflow: hidden;
+  max-width: 18ch;
+}
+
+.heading a {
+  text-decoration: none;
+  color: var(--ink);
+  transition: color 0.3s ease;
+}
+
+.heading a:hover {
+  color: var(--gold);
+}
+
+.details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 32px;
+  border-top: 1px solid var(--line);
+  padding-top: 28px;
+}
+
+.detailLabel {
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 8px;
+}
+
+.detailValue {
+  font-size: 15px;
+}
+
+.detailValue a {
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.detailValue a:hover {
+  color: var(--gold);
+}
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: var(--ink-faint);
+}

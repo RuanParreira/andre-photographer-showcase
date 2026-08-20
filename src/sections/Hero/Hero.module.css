@@ -1,0 +1,136 @@
+.hero {
+  position: relative;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: calc(var(--edge) + 56px) var(--edge) var(--edge);
+  overflow: hidden;
+  background: radial-gradient(120% 90% at 78% 18%, rgba(201, 162, 92, 0.14), transparent 60%), var(--bg);
+}
+
+.canvasWrap {
+  position: absolute;
+  inset: -10% -5%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.canvasWrap canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.content {
+  position: relative;
+  z-index: 1;
+  max-width: 1180px;
+}
+
+.kicker {
+  font-size: 12px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: clamp(18px, 3vw, 32px);
+}
+
+.title {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: clamp(72px, 15vw, 220px);
+  line-height: 0.88;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.titleLine {
+  display: block;
+  overflow: hidden;
+}
+
+.role {
+  font-family: var(--font-sans);
+  font-size: clamp(16px, 2.2vw, 28px);
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  margin-top: clamp(14px, 2vw, 26px);
+}
+
+.sub {
+  margin-top: clamp(28px, 5vw, 56px);
+  max-width: 480px;
+  font-size: clamp(15px, 1.4vw, 18px);
+  line-height: 1.6;
+  color: var(--ink-dim);
+}
+
+.scrollCue {
+  position: absolute;
+  left: var(--edge);
+  bottom: 36px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.scrollLine {
+  width: 1px;
+  height: 40px;
+  background: linear-gradient(var(--gold), transparent);
+}
+
+@media (max-width: 640px) {
+  .scrollCue {
+    display: none;
+  }
+}
+
+.screenReveal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.screenReveal img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Shutter clarão. A radial burst rather than a flat white sheet: a flat fill
+   at any usable opacity reads as the page blinking, while the falloff reads
+   as a light source firing in the room. Kept slightly warm at the core to
+   match the scene's key light (0xfff2d9), and screen-blended so it lifts the
+   dark background instead of painting a grey film over it.
+
+   Deliberately tight (46%/42%, fully transparent by 72%): a wider, softer
+   falloff was tried first and lifted the entire frame to an even mid-grey at
+   peak, which reads as fog rolling in rather than a flash going off. Keeping
+   the corners near-black is what makes it read as a burst of light with a
+   source, and it keeps the effect off the nav/scroll cue at the edges.
+   Opacity is the only thing animated — see handleShutterFire in Hero.jsx. */
+.shutterFlash {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  opacity: 0;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  background: radial-gradient(
+    46% 42% at 50% 45%,
+    rgba(255, 252, 244, 0.98),
+    rgba(255, 243, 221, 0.4) 38%,
+    rgba(255, 236, 202, 0) 72%
+  );
+}
