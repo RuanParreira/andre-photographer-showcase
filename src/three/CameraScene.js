@@ -7,7 +7,7 @@ import { gsap } from "../lib/gsap";
 // via https://sketchfab.com/3d-models/camera-canon-eos-400d-c8c3f307e93f4c829d579d1b369e6b02
 // Licensed CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/) — credit
 // is also surfaced on-page in the Contact/footer section per license terms.
-const MODEL_URL = "/models/camera.glb";
+const MODEL_URL = `${import.meta.env.BASE_URL}models/camera.glb`;
 const TAU = Math.PI * 2;
 
 // Idle "alive" layer, v2: earlier this was six independently-clocked sine
@@ -228,7 +228,7 @@ const BUTTON_HIT_MARGIN = 1.5;
 // overlay is a DOM/GSAP layer owned by Hero.jsx and triggered through the
 // onShutterFire callback — same shape as the existing onScreenEnter/Exit
 // handoff.
-const SHUTTER_SOUND_URL = "/effect/camera.mp3";
+const SHUTTER_SOUND_URL = `${import.meta.env.BASE_URL}effect/camera.mp3`;
 const SHUTTER_SOUND_VOLUME = 0.45;
 
 // Scene-side half of the flash: a short additive spike on the key light, so
