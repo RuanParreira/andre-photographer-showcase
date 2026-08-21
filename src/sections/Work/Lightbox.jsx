@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { gsap, useGSAP, Observer, ScrollSmoother } from '../../lib/gsap'
 import { workImages } from '../../lib/images'
-import styles from './Lightbox.module.css'
 
 const EXIT_MS = 160
 const ENTER_MS = 320
@@ -154,7 +153,7 @@ export default function Lightbox({ items, activeIndex, onClose, onNavigate, redu
   return (
     <div
       ref={overlayRef}
-      className={styles.overlay}
+      className="fixed inset-0 z-100 flex items-center justify-center bg-[rgba(8,7,6,0.92)] p-[clamp(24px,6vw,80px)]"
       role="dialog"
       aria-modal="true"
       aria-label={`${item.title} — expanded view`}
@@ -165,7 +164,7 @@ export default function Lightbox({ items, activeIndex, onClose, onNavigate, redu
       <button
         ref={closeButtonRef}
         type="button"
-        className={styles.close}
+        className="absolute top-[clamp(16px,3vw,32px)] right-[clamp(16px,3vw,32px)] bg-none border border-line text-ink w-10 h-10 rounded-full cursor-pointer text-lg leading-none flex items-center justify-center"
         onClick={onClose}
         aria-label="Close"
       >
@@ -176,7 +175,7 @@ export default function Lightbox({ items, activeIndex, onClose, onNavigate, redu
         <>
           <button
             type="button"
-            className={`${styles.nav} ${styles.prev}`}
+            className="hidden sm:flex absolute top-1/2 -translate-y-1/2 left-[clamp(8px,2vw,24px)] bg-none border border-line text-ink w-11 h-11 rounded-full cursor-pointer text-lg items-center justify-center"
             onClick={() => requestNavigate(-1)}
             aria-label="Previous photo"
           >
@@ -184,7 +183,7 @@ export default function Lightbox({ items, activeIndex, onClose, onNavigate, redu
           </button>
           <button
             type="button"
-            className={`${styles.nav} ${styles.next}`}
+            className="hidden sm:flex absolute top-1/2 -translate-y-1/2 right-[clamp(8px,2vw,24px)] bg-none border border-line text-ink w-11 h-11 rounded-full cursor-pointer text-lg items-center justify-center"
             onClick={() => requestNavigate(1)}
             aria-label="Next photo"
           >
@@ -193,11 +192,11 @@ export default function Lightbox({ items, activeIndex, onClose, onNavigate, redu
         </>
       )}
 
-      <figure ref={figureRef} className={styles.figure}>
-        <div className={styles.imageWrap}>
+      <figure ref={figureRef} className="relative max-w-300 max-h-full w-full flex flex-col items-center gap-5">
+        <div className="relative w-full max-h-[78svh] flex items-center justify-center">
           {image && (
             <img
-              className={styles.image}
+              className="max-w-full max-h-[78svh] w-auto h-auto object-contain"
               src={image.src}
               srcSet={image.srcSet}
               sizes="90vw"
@@ -205,8 +204,8 @@ export default function Lightbox({ items, activeIndex, onClose, onNavigate, redu
             />
           )}
         </div>
-        <figcaption className={styles.caption}>
-          <span className={styles.captionTitle}>{item.title}</span>
+        <figcaption className="flex items-baseline gap-4 text-ink-dim text-[13px] tracking-[0.06em]">
+          <span className="font-display text-xl text-ink">{item.title}</span>
           <span>{item.location}</span>
           <span>{item.year}</span>
         </figcaption>

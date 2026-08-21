@@ -5,7 +5,6 @@ import CameraCanvas from '../../three/CameraCanvas'
 import { workImages } from '../../lib/images'
 import { works } from '../../data/work'
 import { scrollToSection } from '../../lib/scrollToSection'
-import styles from './Hero.module.css'
 
 // The first few entries in data/work.js — the LCD cycles through these
 // (CameraScene's slideshow) instead of showing a single static photo.
@@ -204,8 +203,12 @@ export default function Hero({ reducedMotion }) {
   )
 
   return (
-    <section id="hero" ref={sectionRef} className={styles.hero}>
-      <div className={styles.canvasWrap}>
+    <section
+      id="hero"
+      ref={sectionRef}
+      className="relative min-h-svh flex flex-col justify-center pt-[calc(var(--spacing-edge)+56px)] px-edge pb-edge overflow-hidden bg-[radial-gradient(120%_90%_at_78%_18%,rgba(201,162,92,0.14),transparent_60%),var(--color-bg)]"
+    >
+      <div className="absolute inset-x-[-5%] inset-y-[-10%] z-0 pointer-events-none [&_canvas]:w-full [&_canvas]:h-full [&_canvas]:block">
         <CameraCanvas
           scrollProgressRef={scrollProgress}
           reducedMotion={reducedMotion}
@@ -216,20 +219,31 @@ export default function Hero({ reducedMotion }) {
         />
       </div>
 
-      <div className={styles.content} ref={contentRef}>
-        <p className={styles.kicker} ref={kickerRef}>Urban — Landscape — Nature</p>
-        <h1 className={styles.title} ref={titleRef}>
-          <span className={styles.titleLine}>André</span>
+      <div className="relative z-1 max-w-295" ref={contentRef}>
+        <p className="text-xs tracking-[0.22em] uppercase text-gold mb-[clamp(18px,3vw,32px)]" ref={kickerRef}>
+          Urban — Landscape — Nature
+        </p>
+        <h1
+          className="font-display font-medium text-[clamp(72px,15vw,220px)] leading-[0.88] tracking-[-0.01em] m-0"
+          ref={titleRef}
+        >
+          <span className="block overflow-hidden">André</span>
         </h1>
-        <p className={styles.role} ref={roleRef}>Photographer</p>
-        <p className={styles.sub} ref={subRef}>
+        <p className="font-sans text-[clamp(16px,2.2vw,28px)] tracking-[0.28em] uppercase text-ink-dim mt-[clamp(14px,2vw,26px)]" ref={roleRef}>
+          Photographer
+        </p>
+        <p className="mt-[clamp(28px,5vw,56px)] max-w-120 text-[clamp(15px,1.4vw,18px)] leading-[1.6] text-ink-dim" ref={subRef}>
           Fine-art photography shaped by natural light — cities at dusk,
           open landscapes, and quiet studies of nature.
         </p>
       </div>
 
-      <div className={styles.scrollCue} ref={scrollCueRef} aria-hidden="true">
-        <span className={styles.scrollLine} />
+      <div
+        className="hidden sm:flex absolute left-edge bottom-9 z-1 items-center gap-3 text-[11px] tracking-[0.18em] uppercase text-ink-faint"
+        ref={scrollCueRef}
+        aria-hidden="true"
+      >
+        <span className="w-px h-10 bg-[linear-gradient(var(--color-gold),transparent)]" />
         Scroll
       </div>
 
@@ -242,8 +256,17 @@ export default function Hero({ reducedMotion }) {
           // staying pinned to the viewport during the crossfade. src starts
           // at the first slide and is repointed to whichever one was
           // actually on screen at click time (see handleScreenEnter).
-          <div className={styles.screenReveal} ref={screenRevealRef} aria-hidden="true">
-            <img ref={screenRevealImgRef} src={SCREEN_IMAGES[0]} alt="" />
+          <div
+            className="fixed inset-0 z-60 opacity-0 pointer-events-none"
+            ref={screenRevealRef}
+            aria-hidden="true"
+          >
+            <img
+              className="w-full h-full object-cover block"
+              ref={screenRevealImgRef}
+              src={SCREEN_IMAGES[0]}
+              alt=""
+            />
           </div>,
           document.body
         )}
@@ -253,7 +276,26 @@ export default function Hero({ reducedMotion }) {
         // sit outside #smooth-content to stay locked to the viewport. Sits
         // above that overlay in z so a shot fired at any point of the
         // narrative always flashes over whatever is on screen.
-        <div className={styles.shutterFlash} ref={flashRef} aria-hidden="true" />,
+        //
+        // Shutter clarão. A radial burst rather than a flat white sheet: a flat
+        // fill at any usable opacity reads as the page blinking, while the
+        // falloff reads as a light source firing in the room. Kept slightly
+        // warm at the core to match the scene's key light (0xfff2d9), and
+        // screen-blended so it lifts the dark background instead of painting a
+        // grey film over it.
+        //
+        // Deliberately tight (46%/42%, fully transparent by 72%): a wider,
+        // softer falloff was tried first and lifted the entire frame to an even
+        // mid-grey at peak, which reads as fog rolling in rather than a flash
+        // going off. Keeping the corners near-black is what makes it read as a
+        // burst of light with a source, and it keeps the effect off the
+        // nav/scroll cue at the edges. Opacity is the only thing animated — see
+        // handleShutterFire above.
+        <div
+          className="fixed inset-0 z-70 opacity-0 pointer-events-none mix-blend-screen bg-[radial-gradient(46%_42%_at_50%_45%,rgba(255,252,244,0.98),rgba(255,243,221,0.4)_38%,rgba(255,236,202,0)_72%)]"
+          ref={flashRef}
+          aria-hidden="true"
+        />,
         document.body
       )}
     </section>

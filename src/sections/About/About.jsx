@@ -1,7 +1,6 @@
 import { useRef } from 'react'
 import { gsap, useGSAP, SplitText } from '../../lib/gsap'
 import { profileImages } from '../../lib/images'
-import styles from './About.module.css'
 
 const META = [
   { label: 'Location', value: 'Lisbon, Portugal' },
@@ -77,13 +76,17 @@ export default function About({ reducedMotion }) {
   )
 
   return (
-    <section id="about" ref={sectionRef} className={styles.about}>
-      <div className={styles.portraitGroup}>
-        <div className={styles.imageFrame}>
+    <section
+      id="about"
+      ref={sectionRef}
+      className="relative pt-section-gap px-edge pb-[clamp(56px,7vw,110px)] grid grid-cols-1 lg:grid-cols-[minmax(280px,42%)_1fr] gap-[clamp(40px,6vw,100px)] items-center"
+    >
+      <div className="relative">
+        <div className="relative aspect-[4/5] overflow-hidden bg-bg-soft">
           {portrait && (
             <img
               ref={imageRef}
-              className={styles.image}
+              className="absolute inset-x-0 inset-y-[-8%] w-full h-[116%] object-cover will-change-transform"
               src={portrait.src}
               srcSet={portrait.srcSet}
               sizes="(max-width: 860px) 90vw, 42vw"
@@ -94,10 +97,10 @@ export default function About({ reducedMotion }) {
         </div>
 
         {detail && (
-          <div className={styles.accentFrame}>
+          <div className="absolute w-[44%] xs:w-[40%] lg:w-[44%] right-0 xs:right-[-4%] lg:right-[-7%] bottom-[-6%] xs:bottom-[-8%] lg:bottom-[-11%] aspect-[4/5] overflow-hidden bg-bg-soft border-4 lg:border-[6px] border-bg shadow-[0_24px_48px_rgba(0,0,0,0.5)] z-2">
             <img
               ref={accentImageRef}
-              className={styles.accentImage}
+              className="absolute inset-x-0 inset-y-[-8%] w-full h-[116%] object-cover will-change-transform"
               src={detail.src}
               srcSet={detail.srcSet}
               sizes="(max-width: 860px) 40vw, 18vw"
@@ -108,12 +111,12 @@ export default function About({ reducedMotion }) {
         )}
       </div>
 
-      <div className={styles.text}>
-        <p className={styles.kicker}>About</p>
-        <h2 className={styles.heading} ref={headingRef}>
+      <div className="max-w-[560px]">
+        <p className="text-xs tracking-[0.22em] uppercase text-gold mb-5">About</p>
+        <h2 className="text-[clamp(32px,4.5vw,56px)] leading-[1.1] font-medium overflow-hidden" ref={headingRef}>
           Eight years chasing the hour before the light disappears.
         </h2>
-        <p className={styles.bio}>
+        <p className="mt-[clamp(24px,3vw,36px)] text-[clamp(15px,1.3vw,18px)] leading-[1.7] text-ink-dim max-w-[46ch]">
           André is a photographer working between cities and open land,
           drawn to the moments when daylight turns low and everything gets
           quietly dramatic. His work moves between dense urban streets, wide
@@ -121,11 +124,11 @@ export default function About({ reducedMotion }) {
           available light, without staging.
         </p>
 
-        <dl className={styles.meta}>
+        <dl className="mt-[clamp(36px,4vw,56px)] grid grid-cols-2 gap-x-6 gap-y-7 border-t border-line pt-6">
           {META.map((item) => (
             <div key={item.label}>
-              <dt className={styles.metaLabel}>{item.label}</dt>
-              <dd className={styles.metaValue}>{item.value}</dd>
+              <dt className="text-[10.5px] tracking-[0.16em] uppercase text-ink-faint mb-2">{item.label}</dt>
+              <dd className="text-[15px] text-ink">{item.value}</dd>
             </div>
           ))}
         </dl>

@@ -1,6 +1,5 @@
 import { useRef } from 'react'
 import { gsap, useGSAP, SplitText } from '../../lib/gsap'
-import styles from './Contact.module.css'
 
 const DETAILS = [
   { label: 'Email', value: 'hello@andre.studio', href: 'mailto:hello@andre.studio' },
@@ -36,19 +35,26 @@ export default function Contact({ reducedMotion }) {
   )
 
   return (
-    <section id="contact" ref={sectionRef} className={styles.contact}>
+    <section
+      id="contact"
+      ref={sectionRef}
+      className="relative pt-section-gap px-edge pb-[clamp(40px,5vw,64px)] flex flex-col gap-[clamp(56px,8vw,96px)]"
+    >
       <div>
-        <p className={styles.kicker}>Contact</p>
-        <h2 className={styles.heading} ref={headingRef}>
+        <p className="text-xs tracking-[0.22em] uppercase text-gold mb-[clamp(18px,3vw,30px)]">Contact</p>
+        <h2
+          className="text-[clamp(44px,8vw,120px)] font-medium leading-none overflow-hidden max-w-[18ch] [&_a]:no-underline [&_a]:text-ink [&_a]:transition-colors [&_a]:duration-300 [&_a:hover]:text-gold"
+          ref={headingRef}
+        >
           <a href="mailto:hello@andre.studio">Let&rsquo;s create something.</a>
         </h2>
       </div>
 
-      <dl className={styles.details}>
+      <dl className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-8 border-t border-line pt-7">
         {DETAILS.map((detail) => (
           <div key={detail.label}>
-            <dt className={styles.detailLabel}>{detail.label}</dt>
-            <dd className={styles.detailValue}>
+            <dt className="text-[10.5px] tracking-[0.16em] uppercase text-ink-faint mb-2">{detail.label}</dt>
+            <dd className="text-[15px] [&_a]:no-underline [&_a]:text-ink [&_a:hover]:text-gold">
               {detail.href ? (
                 <a
                   href={detail.href}
@@ -65,7 +71,7 @@ export default function Contact({ reducedMotion }) {
         ))}
       </dl>
 
-      <div className={styles.footer}>
+      <div className="flex justify-between flex-wrap gap-3 text-[11px] tracking-wider text-ink-faint">
         <span>© {new Date().getFullYear()} André. All rights reserved.</span>
         <span>Fictional portfolio, built for demonstration purposes.</span>
         <span>

@@ -2,7 +2,6 @@ import { useRef } from 'react'
 import { gsap, useGSAP } from '../../lib/gsap'
 import { useReducedMotion } from '../../hooks/useReducedMotion'
 import { scrollToSection } from '../../lib/scrollToSection'
-import styles from './Nav.module.css'
 
 const LINKS = [
   { id: 'about', label: 'About' },
@@ -45,14 +44,26 @@ export default function Nav() {
   }
 
   return (
-    <nav className={styles.nav} aria-label="Primary" ref={navRef}>
-      <a href="#hero" className={styles.mark} onClick={(e) => handleClick(e, 'hero')}>
+    <nav
+      className="fixed inset-x-0 top-0 z-50 flex items-center justify-between px-edge py-7 [mix-blend-mode:difference] pointer-events-none [&>*]:pointer-events-auto"
+      aria-label="Primary"
+      ref={navRef}
+    >
+      <a
+        href="#hero"
+        className="font-display text-lg tracking-[0.06em] text-ink no-underline"
+        onClick={(e) => handleClick(e, 'hero')}
+      >
         ANDRÉ
       </a>
-      <ul className={styles.links}>
+      <ul className="flex list-none gap-4 sm:gap-[clamp(20px,3vw,40px)] m-0 p-0">
         {LINKS.map((link) => (
           <li key={link.id}>
-            <a href={`#${link.id}`} onClick={(e) => handleClick(e, link.id)}>
+            <a
+              href={`#${link.id}`}
+              onClick={(e) => handleClick(e, link.id)}
+              className="relative py-1 text-xs tracking-[0.14em] uppercase no-underline text-ink bg-none border-none cursor-pointer after:content-[''] after:absolute after:left-0 after:right-full after:-bottom-0.5 after:h-px after:bg-ink after:transition-[right] after:duration-[0.35s] after:ease-[cubic-bezier(0.22,1,0.36,1)] hover:after:right-0 focus-visible:after:right-0"
+            >
               {link.label}
             </a>
           </li>

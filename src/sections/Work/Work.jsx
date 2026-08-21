@@ -4,7 +4,6 @@ import { gsap, useGSAP, SplitText, Flip } from '../../lib/gsap'
 import { works, categories } from '../../data/work'
 import WorkItem from './WorkItem'
 import Lightbox from './Lightbox'
-import styles from './Work.module.css'
 
 export default function Work({ reducedMotion }) {
   const sectionRef = useRef(null)
@@ -120,23 +119,34 @@ export default function Work({ reducedMotion }) {
     .map((w) => w.slug)
 
   return (
-    <section id="work" ref={sectionRef} className={styles.work}>
-      <div className={styles.header}>
+    <section
+      id="work"
+      ref={sectionRef}
+      className="relative pt-section-gap px-edge pb-[clamp(56px,7vw,110px)]"
+    >
+      <div className="flex flex-wrap items-end justify-between gap-6 mb-[clamp(48px,6vw,88px)]">
         <div>
-          <p className={styles.kicker}>Selected Work</p>
-          <h2 className={styles.heading} ref={headingRef}>
+          <p className="text-xs tracking-[0.22em] uppercase text-gold mb-4">Selected Work</p>
+          <h2
+            className="text-[clamp(32px,4.5vw,56px)] font-medium overflow-hidden"
+            ref={headingRef}
+          >
             Ten frames, a handful of places I keep going back to.
           </h2>
         </div>
 
-        <div className={styles.filters} role="group" aria-label="Filter by category">
+        <div
+          className="flex gap-[clamp(16px,2vw,28px)]"
+          role="group"
+          aria-label="Filter by category"
+        >
           {['All', ...categories].map((category) => (
             <button
               key={category}
               type="button"
               aria-pressed={activeCategory === category}
               data-active={activeCategory === category}
-              className={styles.filterButton}
+              className="relative bg-none border-none py-1 px-0 text-xs tracking-[0.14em] uppercase text-ink-faint cursor-pointer data-[active=true]:text-ink after:content-[''] after:absolute after:left-0 after:-bottom-1 after:h-px after:w-full after:bg-gold after:scale-x-0 after:origin-left after:transition-transform after:duration-300 after:ease-in-out data-[active=true]:after:scale-x-100"
               onClick={() => handleFilter(category)}
             >
               {category}
@@ -145,7 +155,10 @@ export default function Work({ reducedMotion }) {
         </div>
       </div>
 
-      <div className={styles.grid} ref={gridRef}>
+      <div
+        className="grid grid-cols-1 md:grid-cols-12 gap-x-[clamp(20px,2.5vw,28px)] gap-y-[clamp(20px,3vw,32px)]"
+        ref={gridRef}
+      >
         {works.map((item, index) => {
           const matchIndex = matchingSlugs.indexOf(item.slug)
           const dimmed = matchIndex === -1
