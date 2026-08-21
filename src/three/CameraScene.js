@@ -64,16 +64,16 @@ const TURN_POS_Y = -0.05;
 const TURN_POS_Z = 0.5; // the approach — see dollyT
 const TURN_KEY_BOOST = 0.3; // key light brightens slightly as the screen becomes the hero shot
 
-// LCD screen: the model now has a dedicated LCD_Screen mesh (separated out
+// LCD screen: the model now has a dedicated LCD mesh (separated out
 // in Blender specifically so this can be measured instead of guessed — the
 // original model only had the screen baked into the body's one material,
 // with no mesh/UV island of its own, which is what made the old hand-
 // clicked calibration below imprecise in the first place). A second plane,
-// positioned/sized to match LCD_Screen's own geometry, still stands in for
+// positioned/sized to match LCD's own geometry, still stands in for
 // the actual display (its own material/UVs aren't touched, and are likely
 // not laid out for a clean full-bleed photo anyway) — see
 // deriveScreenLocalFromMesh and its call site in _loadCameraModel.
-const LCD_SCREEN_NODE_NAME = "LCD_Screen";
+const LCD_SCREEN_NODE_NAME = "LCD"; // was "LCD_Screen" before the panel-resize re-export
 
 // Lens barrel: a dedicated Group node in the GLB ("cilindro_low1") holding
 // the four material sub-meshes that make up the lens (housing, glass,
@@ -186,6 +186,8 @@ const DIAL_SWING_EASE = "sine.inOut";
 // How much bigger than the dial's own real footprint its invisible
 // click-comfort proxy is — see _addComfortHitProxy.
 const DIAL_HIT_MARGIN = 1.4;
+const DIAL_SOUND_URL = `${import.meta.env.BASE_URL}effect/click.mp3`;
+const DIAL_SOUND_VOLUME = 0.5;
 
 // Shutter button: the GLB's own "Botao" mesh (separated out in Blender to
 // mark where it goes) came through as a degenerate flat triangle — not
@@ -230,6 +232,15 @@ const BUTTON_HIT_MARGIN = 1.5;
 // handoff.
 const SHUTTER_SOUND_URL = `${import.meta.env.BASE_URL}effect/camera.mp3`;
 const SHUTTER_SOUND_VOLUME = 0.45;
+
+// Lens-barrel spin sound (see handleCylinderClick/_playZoomSound). Faded in
+// and out rather than played raw, with the fade-out timed to land exactly on
+// CYLINDER_SPIN_DURATION so it always finishes together with the visual
+// spin, whatever the source clip's own native length is.
+const ZOOM_SOUND_URL = `${import.meta.env.BASE_URL}effect/zoom.mp3`;
+const ZOOM_SOUND_VOLUME = 0.35;
+const ZOOM_SOUND_ATTACK = 0.15;
+const ZOOM_SOUND_RELEASE = 0.35;
 
 // Scene-side half of the flash: a short additive spike on the key light, so
 // the model itself is momentarily lit by its own flash instead of just
@@ -312,7 +323,7 @@ const SCREEN_INSET_FALLBACK = 0.72;
 // curve, not to compensate for a wrong calibration.
 const SCREEN_INSET_MEASURED = 0.97;
 
-// How far the photo plane floats off the LCD_Screen backing it would
+// How far the photo plane floats off the LCD backing it would
 // otherwise be exactly coplanar with, as a fraction of the plane's own width
 // (so it scales with the model instead of being a magic world-space number).
 // See the lift in _updateScreenPlane for why polygonOffset could not carry
@@ -340,19 +351,33 @@ const SCREEN_SURFACE_LIFT = 0.006;
 //
 // So: leg one straightens and centres (the model eases to a pose where the
 // LCD is dead centre and square to the viewport, nothing else changes — same
-// depth, same apparent size), then a beat of genuine stillness, then leg two
-// pushes the camera straight down the view axis with no lateral component at
-// all. entryT (0 = resting, 1 = arrived) is the single parameter both legs
-// read off, in exactly the same style as the scroll narrative's
+// depth, same apparent size), then leg two picks up right where it left off
+// and pushes the camera straight down the view axis with no lateral
+// component at all. entryT (0 = resting, 1 = arrived) is the single
+// parameter both legs read off, in exactly the same style as the scroll narrative's
 // rotationT/dollyT/revealT: one signal, shaped into overlapping phases by
-// smoothstep windows. The gap between ENTRY_ALIGN_END and
-// ENTRY_APPROACH_START is the hold, and because the windows are ordered, a
-// reversal (see _tick's auto-close) unwinds them in the correct reverse
-// order for free — the camera retreats first, and only then does the model
-// swing back to its scroll pose.
+// smoothstep windows. ENTRY_APPROACH_START sits flush against ENTRY_ALIGN_END
+// (no gap) rather than leaving a held beat between them — back-to-back
+// smoothsteps still meet at zero velocity on both sides, so the handoff
+// reads as one continuous glide, not a dead freeze followed by a restart.
+// And because the windows are ordered, a reversal (see _tick's auto-close)
+// still unwinds them in the correct reverse order for free — the camera
+// retreats first, and only then does the model swing back to its scroll
+// pose.
 const ENTRY_DURATION = 2.5;
 const ENTRY_ALIGN_END = 0.34; // straighten + centre: the first ~0.85s
-const ENTRY_APPROACH_START = 0.44; // ~0.25s of stillness, then ~1.4s of straight push
+const ENTRY_APPROACH_START = ENTRY_ALIGN_END; // straight push starts the instant align finishes
+// Whoosh for the push itself — see _playWhooshSound. Only the approach leg's
+// own span (not the align that precedes it), so the sound starts right as
+// the camera actually begins moving toward the screen.
+const ENTRY_APPROACH_DURATION = ENTRY_DURATION * (1 - ENTRY_APPROACH_START);
+const WHOOSH_SOUND_URL = `${import.meta.env.BASE_URL}effect/whoosh.mp3`;
+const WHOOSH_SOUND_VOLUME = 0.5;
+const WHOOSH_SOUND_ATTACK = 0.12;
+const WHOOSH_SOUND_RELEASE = 0.4;
+// How far into the approach's own ease (0-1, not entryT) to wait before
+// firing the whoosh — see the _tick call site's comment.
+const WHOOSH_TRIGGER_APPROACH = 0.06;
 const SLIDE_HOLD_DURATION = 3.2; // seconds each LCD slideshow photo stays fully visible
 const SLIDE_FADE_DURATION = 0.8; // seconds to dip to transparent and back (texture swaps at the midpoint) between slides
 const CLICK_MIN_PROGRESS = 0.55; // scroll progress by which the turn (rotationT = smoothstep(0.15, 0.75, progress), ~74% done here) has resolved enough for the LCD to read clearly, without waiting for the full settle/approach/light-boost tail
@@ -451,9 +476,15 @@ export class CameraScene {
     // Alternates each click: 1 = spin left (CCW as seen on screen), -1 =
     // spin right (CW) — see handleCylinderClick.
     this._cylinderSpinDir = 1;
+    // Zoom-spin sound + its volume-fade tween — see _playZoomSound.
+    this._zoomAudio = this._createAudio(ZOOM_SOUND_URL, ZOOM_SOUND_VOLUME);
+    this._zoomAudioTween = null;
     // Set once the model loads, if it has the matching node — see
     // _makeDialState/_spinDialToggle.
     this.modeDial = null;
+    // Detent click for the dial toggle — see handleModeDialClick. A single
+    // short click, so unlike _zoomAudio it's just played, no fade envelope.
+    this._dialAudio = this._createAudio(DIAL_SOUND_URL, DIAL_SOUND_VOLUME);
     // Built in _loadCameraModel regardless of the GLB's own (broken) Botao
     // mesh — see BUTTON_LOCAL_POSITION above and _buildShutterButton.
     this.shutterButton = null;
@@ -467,7 +498,7 @@ export class CameraScene {
     // shutter behaves exactly as before.
     this._flashT = 0;
     this._kick = { pitch: 0, yaw: 0, y: 0 };
-    this._shutterAudio = this._createShutterAudio();
+    this._shutterAudio = this._createAudio(SHUTTER_SOUND_URL, SHUTTER_SOUND_VOLUME);
     // Slideshow: the LCD cycles through screenImages while idle (see
     // _updateSlideshow). _lastTickTime feeds a per-frame delta rather than
     // an absolute clock so progress pauses while inactive (off-screen)
@@ -487,6 +518,12 @@ export class CameraScene {
     this._entryAnimFrom = 0;
     this._entryAnimStart = 0;
     this._entryAnimDuration = ENTRY_DURATION;
+    // Push whoosh + its fade tween, and a once-per-open latch so it fires
+    // exactly once as entryT crosses ENTRY_APPROACH_START — see _tick and
+    // _playWhooshSound.
+    this._whooshAudio = this._createAudio(WHOOSH_SOUND_URL, WHOOSH_SOUND_VOLUME);
+    this._whooshAudioTween = null;
+    this._whooshFired = false;
     // The straight-on pose the align leg eases the model into, recomputed at
     // each click from wherever the scroll narrative currently has it — see
     // _computeEntryPose.
@@ -609,7 +646,7 @@ export class CameraScene {
         const scale = 2.2 / maxDim;
 
         // Must run before model.scale/position are normalized below —
-        // deriveScreenLocalFromMesh needs LCD_Screen's matrixWorld relative
+        // deriveScreenLocalFromMesh needs LCD's matrixWorld relative
         // to modelGroup's own (still-raw) transform, not the normalized one.
         // Guarded on .geometry too: an object merely named LCD_SCREEN_NODE_NAME
         // isn't enough — an Empty (or a mesh that lost its geometry on
@@ -642,7 +679,7 @@ export class CameraScene {
         this._bodyMaterials = [];
         model.traverse((child) => {
           if (!child.isMesh) return;
-          // LCD_Screen is mainly a geometric reference now (for
+          // LCD is mainly a geometric reference now (for
           // deriveScreenLocalFromMesh above) — the actual photo is the
           // separate screenPlane (see _buildScreenPlane) floating just in
           // front of it, so this mesh's own material/UVs (whatever it kept
@@ -672,15 +709,17 @@ export class CameraScene {
             child.visible = false;
             return;
           }
-          // The old switch ring (see POWER_RING removal above) sits almost
-          // exactly where the new procedural shutter button now lives —
-          // left visible as an inert body part at first, but the two
-          // visually crowd/overlap in that corner, so it's hidden now that
-          // the button has taken over that spot.
-          if (child.parent?.name === "pCylinder8") {
-            child.visible = false;
-            return;
-          }
+          // pCylinder8 (the small ridged switch ring) — only its click-to-
+          // spin interaction was ever meant to go (its geometry has an
+          // open/cut-away interior that shows through once rotated off its
+          // resting pose — a model problem, not fixable from code — see
+          // MODE_DIAL_NODE_NAME above). The mesh itself stays visible, same
+          // as pCylinder9: it's a real part of the shell (the body has a
+          // socket modelled for it), and hiding it left a visible gap/dent
+          // where it used to sit. It sits close to the procedural shutter
+          // button in X/Y (offset mainly in Z, where the button stands
+          // proud of the surface) — if the two read as crowding each other,
+          // that's a reposition of BUTTON_LOCAL_POSITION, not another hide.
           if (child.material?.name === LENS_GLASS_MATERIAL) {
             this._setUpLensGlass(child.material);
           } else if (child.material?.name === LENS_INNER_MATERIAL) {
@@ -720,7 +759,7 @@ export class CameraScene {
         // in front of it).
         //
         // Two kinds of mesh are deliberately left out despite being real
-        // geometry: LCD_Screen's own backing (sits almost exactly
+        // geometry: LCD's own backing (sits almost exactly
         // coincident with screenPlane's own geometry — see the
         // LCD_SCREEN_NODE_NAME branch above — purely to hide the hollow
         // body during the slideshow's transparent dip; including it would
@@ -842,7 +881,7 @@ export class CameraScene {
       side: THREE.DoubleSide,
       toneMapped: false, // unlit + untouched by ACES — must match the DOM <img> exactly at crossfade
       transparent: true, // _updateSlideshow dips opacity to 0 between slides
-      // LCD_Screen's real geometry isn't perfectly flat, so it doesn't sit
+      // LCD's real geometry isn't perfectly flat, so it doesn't sit
       // at a single consistent depth relative to this idealized flat plane
       // (see deriveScreenLocalFromMesh) — with normal depth testing, its
       // opaque backing material (_loadCameraModel) would win the z-test in
@@ -963,7 +1002,7 @@ export class CameraScene {
     const planeWidth = screenLocal.width * worldScale * this.screenInset;
     const planeHeight = screenLocal.height * worldScale * this.screenInset;
 
-    // Float the photo just clear of the LCD_Screen backing mesh, which it is
+    // Float the photo just clear of the LCD backing mesh, which it is
     // otherwise exactly coplanar with (that mesh is a mere ~7e-6 world units
     // thick — see _screenBasisQuaternion for why it is there at all).
     //
@@ -1000,7 +1039,7 @@ export class CameraScene {
 
   // Plane geometry uses plain 0-1 UVs, which would stretch the texture to
   // whatever the plane's current aspect happens to be — visibly different
-  // from the DOM <img>'s `object-fit: cover` (Hero.module.css) at every
+  // from the DOM <img>'s `object-fit: cover` (Hero.jsx) at every
   // frame, not just at the crossfade. Crops the texture the same way cover
   // does (via repeat/offset) so both layers show an identical framing of
   // the photo throughout the whole grow phase, and the crossfade handoff
@@ -1056,6 +1095,8 @@ export class CameraScene {
       this.entryT = 0;
     }
     this._screenEntered = false;
+    this._whooshFired = false;
+    this._stopWhooshSound();
   }
 
   // Raycasts against every real surface at once (see _occluders) and
@@ -1213,7 +1254,111 @@ export class CameraScene {
       duration: CYLINDER_SPIN_DURATION,
       ease: CYLINDER_SPIN_EASE,
     });
+    this._playZoomSound();
     return true;
+  }
+
+  // Fades this._zoomAudio in, then back out exactly at CYLINDER_SPIN_DURATION
+  // — same duration as the rotation tween above, so the sound always ends
+  // together with the spin instead of trailing or cutting off. A re-click
+  // mid-spin kills whatever fade is running and restarts both from 0, same
+  // as the rotation tween's own overwrite behavior. playbackRate stretches
+  // the clip to that exact length once its metadata is known, since the
+  // source file's own length isn't guaranteed to match the spin duration.
+  _playZoomSound() {
+    const audio = this._zoomAudio;
+    if (!audio) return;
+    if (this._zoomAudioTween) this._zoomAudioTween.kill();
+    if (Number.isFinite(audio.duration) && audio.duration > 0) {
+      audio.playbackRate = THREE.MathUtils.clamp(
+        audio.duration / CYLINDER_SPIN_DURATION,
+        0.5,
+        2
+      );
+    }
+    audio.currentTime = 0;
+    audio.volume = 0;
+    audio.play().catch(() => {});
+    this._zoomAudioTween = gsap
+      .timeline({
+        onComplete: () => {
+          audio.pause();
+          audio.currentTime = 0;
+        },
+      })
+      .to(audio, {
+        volume: ZOOM_SOUND_VOLUME,
+        duration: ZOOM_SOUND_ATTACK,
+        ease: "sine.out",
+      })
+      .to(
+        audio,
+        { volume: 0, duration: ZOOM_SOUND_RELEASE, ease: "sine.in" },
+        CYLINDER_SPIN_DURATION - ZOOM_SOUND_RELEASE
+      );
+  }
+
+  // Same fade-in/out shape as _playZoomSound, timed to ENTRY_APPROACH_DURATION
+  // (the push leg only, not the align that precedes it — see the _tick call
+  // site) instead of CYLINDER_SPIN_DURATION. Unlike the spin, this one can be cut short from
+  // outside — scrolling back up mid-push auto-closes the screen — so
+  // _stopWhooshSound below is the reversal's escape hatch rather than a
+  // second copy of this fade.
+  //
+  // Deliberately NOT playbackRate-stretched to fit the window (unlike
+  // _playZoomSound): HTMLAudioElement's resampling at rates other than 1 on
+  // a compressed source is low quality — audibly dragging/pitched down
+  // below 1, and glitchy/stuttering above — so a whoosh (heavy on transient
+  // noise) shows the artifact far more than the lens spin's steadier tone
+  // does. The fade envelope alone keeps it smooth; if the clip is shorter
+  // than the window it just finishes early instead of being stretched to fit.
+  _playWhooshSound() {
+    const audio = this._whooshAudio;
+    if (!audio) return;
+    if (this._whooshAudioTween) this._whooshAudioTween.kill();
+    audio.playbackRate = 1;
+    audio.currentTime = 0;
+    audio.volume = 0;
+    audio.play().catch(() => {});
+    this._whooshAudioTween = gsap
+      .timeline({
+        onComplete: () => {
+          audio.pause();
+          audio.currentTime = 0;
+        },
+      })
+      .to(audio, {
+        volume: WHOOSH_SOUND_VOLUME,
+        duration: WHOOSH_SOUND_ATTACK,
+        ease: "sine.out",
+      })
+      .to(
+        audio,
+        { volume: 0, duration: WHOOSH_SOUND_RELEASE, ease: "sine.in" },
+        ENTRY_APPROACH_DURATION - WHOOSH_SOUND_RELEASE
+      );
+  }
+
+  // Called from _resetScreenTransition — covers both the watched auto-close
+  // (scrolling back up mid-transition) and the instant off-screen reset, so
+  // a whoosh that's still fading never keeps playing into a closed/closing
+  // screen. Fades out fast rather than cutting instantly, same reasoning as
+  // the attack/release shape above: still a click-driven sound, not meant to
+  // click on stop either.
+  _stopWhooshSound() {
+    const audio = this._whooshAudio;
+    if (!audio) return;
+    if (this._whooshAudioTween) this._whooshAudioTween.kill();
+    if (audio.paused) return;
+    this._whooshAudioTween = gsap.to(audio, {
+      volume: 0,
+      duration: WHOOSH_SOUND_RELEASE,
+      ease: "sine.in",
+      onComplete: () => {
+        audio.pause();
+        audio.currentTime = 0;
+      },
+    });
   }
 
   // Adds an invisible, moderately enlarged raycast-only sphere as a SIBLING
@@ -1271,7 +1416,7 @@ export class CameraScene {
   // Captures a dial/lever node's resting quaternion once at load, plus the
   // bit of state _spinDialToggle needs to ease it between rest and swung.
   // Returns null (with a console warning) if the model doesn't have that
-  // node, matching the lensCylinder/LCD_Screen fallback pattern above.
+  // node, matching the lensCylinder/LCD fallback pattern above.
   _makeDialState(model, nodeName) {
     const object = model.getObjectByName(nodeName);
     if (!object) {
@@ -1299,6 +1444,10 @@ export class CameraScene {
   handleModeDialClick(nx, ny) {
     if (!this.hitTestModeDial(nx, ny)) return false;
     this._spinDialToggle(this.modeDial, MODE_DIAL_SWING);
+    if (this._dialAudio) {
+      this._dialAudio.currentTime = 0;
+      this._dialAudio.play().catch(() => {});
+    }
     return true;
   }
 
@@ -1457,20 +1606,21 @@ export class CameraScene {
     return true;
   }
 
-  // One HTMLAudioElement, created up front and reused, rather than a fresh
-  // one per shot: the press guard in handleShutterButtonClick already stops
-  // shots from overlapping, so rewinding this one to 0 is enough, and it
-  // means the file is fetched/decoded once on load instead of on the first
-  // click (where the network round-trip would put the sound noticeably
-  // behind the flash). Constructed defensively — Audio is unavailable in
-  // non-browser environments, and a missing/undecodable file should cost the
-  // rest of the interaction nothing.
-  _createShutterAudio() {
+  // One HTMLAudioElement per sound, created up front and reused rather than
+  // a fresh one per interaction: the press guard in handleShutterButtonClick
+  // (and the fade tween in _playZoomSound) already stop overlapping replays,
+  // so rewinding to 0 is enough, and it means each file is fetched/decoded
+  // once on load instead of on first use (where the network round-trip
+  // would put the sound noticeably behind the visual). Constructed
+  // defensively — Audio is unavailable in non-browser environments, and a
+  // missing/undecodable file should cost the rest of the interaction
+  // nothing.
+  _createAudio(url, volume) {
     if (typeof Audio === "undefined") return null;
     try {
-      const audio = new Audio(SHUTTER_SOUND_URL);
+      const audio = new Audio(url);
       audio.preload = "auto";
-      audio.volume = SHUTTER_SOUND_VOLUME;
+      audio.volume = volume;
       return audio;
     } catch {
       return null;
@@ -1622,8 +1772,8 @@ export class CameraScene {
         // Linear in time, deliberately: all the easing lives in the alignT /
         // approachT windows below, so each leg gets its own clean
         // ease-in/out. Shaping this as well would compound into a double ease
-        // and, worse, would smear the hold between the legs — the pause only
-        // reads as a deliberate beat if entryT crosses it at a steady rate.
+        // and, worse, would smear the handoff between the legs — it only
+        // reads as one continuous glide if entryT crosses it at a steady rate.
         const animT = Math.min(animElapsed / this._entryAnimDuration, 1);
         this.entryT = THREE.MathUtils.lerp(
           this._entryAnimFrom,
@@ -1636,11 +1786,30 @@ export class CameraScene {
         this._screenEntered = true;
         this.onScreenEnter?.(this.screenImages[this._slideIndex]);
       }
+      // Fires once per open, a little into the approach leg rather than at
+      // its exact start (entryT === ENTRY_APPROACH_START): approachT is a
+      // smoothstep, so its derivative is ~0 right at that edge — the camera
+      // is still visually still for its first fraction of a second. Waiting
+      // for approachT itself to clear a small threshold (rather than adding
+      // a fixed time delay after ENTRY_APPROACH_START) ties the whoosh to
+      // "the push is actually visible" and keeps working correctly even
+      // when _entryAnimDuration is shortened (re-clicking mid-reversal — see
+      // _setEntryTarget) instead of assuming the full ENTRY_DURATION.
+      if (
+        this.entryTarget === 1 &&
+        !this._whooshFired &&
+        smoothstep(ENTRY_APPROACH_START, 1, this.entryT) >=
+          WHOOSH_TRIGGER_APPROACH
+      ) {
+        this._whooshFired = true;
+        this._playWhooshSound();
+      }
 
       // The two legs of the entry, shaped out of that one signal — same
-      // idiom as rotationT/dollyT/revealT above. The gap between them is the
-      // hold, and their ordering is what makes a reversal unwind correctly
-      // without any extra bookkeeping.
+      // idiom as rotationT/dollyT/revealT above. Back-to-back (no hold
+      // between them — see ENTRY_APPROACH_START above), and their ordering
+      // is what makes a reversal unwind correctly without any extra
+      // bookkeeping.
       const alignT = smoothstep(0, ENTRY_ALIGN_END, this.entryT);
       const approachT = smoothstep(ENTRY_APPROACH_START, 1, this.entryT);
 
@@ -1678,7 +1847,7 @@ export class CameraScene {
       // pose it would have been in anyway, with nothing to unwind or restore.
       // At alignT = 1 the blend is total, which also means the idle bob and
       // any in-flight shutter kick are fully overridden — the model is
-      // genuinely still for the hold, not almost still.
+      // genuinely still through the rest of the entry, not almost still.
       if (this._entryPose && alignT > 0) {
         this.group.quaternion.slerp(this._entryPose.quaternion, alignT);
         this.group.position.lerp(this._entryPose.position, alignT);
@@ -1759,6 +1928,8 @@ export class CameraScene {
     window.removeEventListener("resize", this._handleResize);
     if (this.lensCylinder) gsap.killTweensOf(this.lensCylinder.rotation);
     if (this.modeDial) gsap.killTweensOf(this.modeDial);
+    if (this._zoomAudioTween) this._zoomAudioTween.kill();
+    if (this._whooshAudioTween) this._whooshAudioTween.kill();
     gsap.killTweensOf(this._kick);
     gsap.killTweensOf(this);
     // Stop a shot that's still ringing out — the element outlives this
@@ -1768,6 +1939,21 @@ export class CameraScene {
       this._shutterAudio.pause();
       this._shutterAudio.src = "";
       this._shutterAudio = null;
+    }
+    if (this._zoomAudio) {
+      this._zoomAudio.pause();
+      this._zoomAudio.src = "";
+      this._zoomAudio = null;
+    }
+    if (this._dialAudio) {
+      this._dialAudio.pause();
+      this._dialAudio.src = "";
+      this._dialAudio = null;
+    }
+    if (this._whooshAudio) {
+      this._whooshAudio.pause();
+      this._whooshAudio.src = "";
+      this._whooshAudio = null;
     }
     // Only whichever slide is currently assigned as the screen plane's
     // material.map gets caught by the scene traversal below — the rest of
