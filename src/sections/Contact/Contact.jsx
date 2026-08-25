@@ -1,9 +1,18 @@
 import { useRef } from 'react'
 import { gsap, useGSAP, SplitText } from '../../lib/gsap'
 
+// Plain values, no `href`. André is a fictional photographer, so every address
+// here is invented — wiring them up meant a mail client opening onto a mailbox
+// that does not exist, and an Instagram handle that jumped the page back to the
+// top. Both read as the demo being broken rather than as it being a demo. They
+// are printed as what they are: the contact block of a portfolio that is a
+// showcase, which the footer already says outright.
+//
+// The 3D model credit at the bottom of this file is the exception and stays
+// live: that one is a real attribution the CC BY 4.0 licence requires.
 const DETAILS = [
-  { label: 'Email', value: 'hello@andre.studio', href: 'mailto:hello@andre.studio' },
-  { label: 'Instagram', value: '@andre.frame', href: 'https://instagram.com/andre.frame' },
+  { label: 'Email', value: 'hello@andre.studio' },
+  { label: 'Instagram', value: '@andre.frame' },
   { label: 'Location', value: 'Lisbon, Portugal — available worldwide' },
 ]
 
@@ -41,12 +50,18 @@ export default function Contact({ reducedMotion }) {
       className="relative pt-section-gap px-edge pb-[clamp(40px,5vw,64px)] flex flex-col gap-[clamp(56px,8vw,96px)]"
     >
       <div>
-        <p className="text-xs tracking-[0.22em] uppercase text-gold mb-[clamp(18px,3vw,30px)]">Contact</p>
+        <p className="text-xs tracking-[0.22em] uppercase text-gold mb-[clamp(18px,3vw,30px)]">
+          <span className="text-gold-dim tabular-nums">03</span>
+          <span className="mx-2.5 text-ink-faint">—</span>
+          Contact
+        </p>
+        {/* A heading, not a mail link. The hover-to-gold went with the href:
+            a colour change under the pointer promises something will happen. */}
         <h2
-          className="text-[clamp(44px,8vw,120px)] font-medium leading-none overflow-hidden max-w-[18ch] [&_a]:no-underline [&_a]:text-ink [&_a]:transition-colors [&_a]:duration-300 [&_a:hover]:text-gold"
+          className="text-[clamp(44px,8vw,120px)] font-medium leading-none overflow-hidden max-w-[18ch]"
           ref={headingRef}
         >
-          <a href="mailto:hello@andre.studio">Let&rsquo;s create something.</a>
+          Let&rsquo;s create something.
         </h2>
       </div>
 
@@ -54,19 +69,7 @@ export default function Contact({ reducedMotion }) {
         {DETAILS.map((detail) => (
           <div key={detail.label}>
             <dt className="text-[10.5px] tracking-[0.16em] uppercase text-ink-faint mb-2">{detail.label}</dt>
-            <dd className="text-[15px] [&_a]:no-underline [&_a]:text-ink [&_a:hover]:text-gold">
-              {detail.href ? (
-                <a
-                  href={detail.href}
-                  target={detail.href.startsWith('http') ? '_blank' : undefined}
-                  rel={detail.href.startsWith('http') ? 'noopener noreferrer' : undefined}
-                >
-                  {detail.value}
-                </a>
-              ) : (
-                detail.value
-              )}
-            </dd>
+            <dd className="text-[15px] text-ink">{detail.value}</dd>
           </div>
         ))}
       </dl>

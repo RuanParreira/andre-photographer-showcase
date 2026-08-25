@@ -205,6 +205,41 @@ const DIAL_SOUND_VOLUME = 0.5;
 // it from.
 const BUTTON_NODE_NAME = "Botao";
 const BUTTON_LOCAL_POSITION = new THREE.Vector3(-1.605, 0.758, 0.421);
+
+// The parts Hero can hang a scroll callout off, by the id it asks for. Only
+// nodes that are also click targets belong here — a callout exists to point at
+// something the visitor can actually do.
+// Resolved per frame rather than stored as names, because not every part is
+// findable the same way. The lens and dial are real transformed nodes, so a
+// name lookup lands on the geometry. The LCD is not: LCD_SCREEN_NODE_NAME
+// carries no transform of its own (see deriveScreenLocalFromMesh), so looking
+// it up by name returns its parent's origin — a point buried inside the body,
+// which reads as permanently occluded. The built screen plane is the panel's
+// actual position, so that is what a callout must point at.
+const HOTSPOT_RESOLVERS = {
+  lens: (scene) => scene.modelGroup?.getObjectByName(CYLINDER_NODE_NAME),
+  dial: (scene) => scene.modelGroup?.getObjectByName(MODE_DIAL_NODE_NAME),
+  screen: (scene) => scene.screenPlane,
+};
+
+// Where the leader line should actually land, as an offset from the node's
+// centre in model-local space (+Z is forward, toward the lens). A node's centre
+// is the right place to *test* visibility from but not always the right place
+// to point at: the barrel's centre sits on its axis, halfway along, so a ring
+// drawn there reads as floating inside the camera rather than resting on the
+// lens. Pushing it forward puts it on the front of the barrel where a person
+// would actually put their fingers to turn it.
+const HOTSPOT_ANCHOR_OFFSETS = {
+  lens: new THREE.Vector3(0, 0, 0.45),
+};
+
+// Reused across frames — _reportHotspots runs inside the render loop, and a
+// fresh Vector3 per part per frame is garbage for no reason.
+const _hotspotWorld = new THREE.Vector3();
+const _hotspotProbe = new THREE.Vector3();
+const _hotspotOffset = new THREE.Vector3();
+const _hotspotQuat = new THREE.Quaternion();
+const _hotspotScale = new THREE.Vector3();
 // The body panel at that spot slopes forward toward the lens rather than
 // sitting flat like the mode dial's top-down surface, so the button is
 // pitched forward (tilted around local X, toward +Z where the lens points)
@@ -446,6 +481,9 @@ export class CameraScene {
       onScreenEnter,
       onScreenExit,
       onShutterFire,
+      onModelReady,
+      onModelFail,
+      onHotspots,
     } = {},
   ) {
     this.canvas = canvas;
@@ -454,6 +492,14 @@ export class CameraScene {
     this.onScreenEnter = onScreenEnter;
     this.onScreenExit = onScreenExit;
     this.onShutterFire = onShutterFire;
+    // Fired once, either way, when the GLB resolves. Hero decides how long to
+    // pin the section on the answer, so silence is not an option here.
+    this.onModelReady = onModelReady;
+    this.onModelFail = onModelFail;
+    // Per-frame screen positions for whichever parts setHotspotTargets names.
+    // Empty by default: nothing is tracked until someone asks.
+    this.onHotspots = onHotspots;
+    this._hotspotIds = [];
     this.startTime = performance.now();
     this.pointer = { x: 0, y: 0 };
     this.active = true;
@@ -566,10 +612,26 @@ export class CameraScene {
     this._loadCameraModel();
 
     this._handleResize = this._handleResize.bind(this);
+    this._handlePixelRatioChange = this._handlePixelRatioChange.bind(this);
     this._tick = this._tick.bind(this);
 
     this._handleResize();
+    // A ResizeObserver, not just the window's resize event. The canvas lives
+    // inside the pinned Hero section, whose box ScrollTrigger resizes during
+    // its own refresh — which happens *after* the window resize listeners have
+    // run. Measured, that left the drawing buffer exactly one resize behind the
+    // CSS box (at 1200x900 the buffer was still 1568x1080), and a buffer whose
+    // aspect disagrees with its box is precisely what stretches the model.
+    // A ResizeObserver fires after layout, so it cannot read a stale size.
+    this._resizeObserver = new ResizeObserver(this._handleResize);
+    if (canvas.parentElement) this._resizeObserver.observe(canvas.parentElement);
     window.addEventListener("resize", this._handleResize);
+    // devicePixelRatio can change with the box staying exactly the same size —
+    // dragging the window onto a display of a different density does it, and so
+    // does zoom in browsers that keep the layout viewport fixed. Neither the
+    // resize event nor the observer fires for that, so the ratio is watched
+    // directly.
+    this._watchPixelRatio();
     this._frameId = requestAnimationFrame(this._tick);
   }
 
@@ -786,9 +848,18 @@ export class CameraScene {
 
         this._screenBasisQuat = this._screenBasisQuaternion();
         this._buildScreenPlane();
+
+        this.onModelReady?.();
       },
       undefined,
-      (err) => console.error("[CameraScene] failed to load camera model", err),
+      (err) => {
+        console.error("[CameraScene] failed to load camera model", err);
+        // Hero sizes its whole scroll narrative around whether this arrived —
+        // without the signal a failed load leaves the section pinned over an
+        // empty canvas for two screens of scrolling. See onModelFail's use in
+        // CameraCanvas.
+        this.onModelFail?.();
+      },
     );
   }
 
@@ -1675,14 +1746,56 @@ export class CameraScene {
     this.onShutterFire?.();
   }
 
+  // A `(resolution: Ndppx)` query matches one exact ratio, so it stops matching
+  // the moment the ratio moves — which is the notification. It then has to be
+  // re-armed against the new value, since the old query will never fire again.
+  _watchPixelRatio() {
+    if (this.disposed) return;
+    this._dprQuery?.removeEventListener("change", this._handlePixelRatioChange);
+    this._dprQuery = window.matchMedia(
+      `(resolution: ${window.devicePixelRatio}dppx)`,
+    );
+    this._dprQuery.addEventListener("change", this._handlePixelRatioChange);
+  }
+
+  _handlePixelRatioChange() {
+    this._handleResize();
+    this._watchPixelRatio();
+  }
+
   _handleResize() {
     const parent = this.canvas.parentElement;
     if (!parent) return;
     const { clientWidth: w, clientHeight: h } = parent;
     if (!w || !h) return;
+
+    // Re-read rather than trusting the value captured at construction: page
+    // zoom changes devicePixelRatio, and a buffer still sized for the old ratio
+    // renders soft.
+    const ratio = Math.min(window.devicePixelRatio, 2);
+
+    // Both observers can fire for the same layout change, so bail when nothing
+    // actually moved instead of reallocating the drawing buffer twice.
+    if (w === this._sizedWidth && h === this._sizedHeight && ratio === this._sizedRatio) {
+      return;
+    }
+    this._sizedWidth = w;
+    this._sizedHeight = h;
+    this._sizedRatio = ratio;
+
+    this.renderer.setPixelRatio(ratio);
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+
+    // Redraw here rather than waiting for the next animation frame. Two things
+    // go wrong otherwise, and both look like the model jumping and settling
+    // back rather than like a resize: the frame's rAF render has already run at
+    // the old size, so the browser stretches that stale buffer into the new box
+    // for a paint; and reallocating the buffer clears it, so the paint can
+    // instead show nothing at all. Rendering now means the buffer holds a
+    // correct frame at the correct size before the browser paints it.
+    if (!this.disposed) this.renderer.render(this.scene, this.camera);
   }
 
   // See the block above the class for `cameraPhrase` — this just reads
@@ -1919,12 +2032,81 @@ export class CameraScene {
 
     if (this.active) this.renderer.render(this.scene, this.camera);
 
+    // After the render, so the projection matches the frame just drawn rather
+    // than trailing it by one.
+    this._reportHotspots();
+
     this._frameId = requestAnimationFrame(this._tick);
+  }
+
+  // Which parts the caller currently wants tracked. Kept to what is actually
+  // on screen: every id in here costs a projection and a raycast per frame, so
+  // Hero hands over one at a time rather than asking for all of them.
+  setHotspotTargets(ids) {
+    this._hotspotIds = ids ?? [];
+  }
+
+  // Screen positions for the tracked parts, in canvas-relative 0..1 coords, so
+  // the DOM overlay can anchor to real geometry instead of to hardcoded
+  // guesses that would drift the moment the body rotates. `occluded` is a true
+  // depth test through the existing raycaster — a callout pointing at a part
+  // that has turned behind the body would otherwise keep pointing at its
+  // silhouette.
+  _reportHotspots() {
+    if (!this.onHotspots || !this.modelLoaded || !this._hotspotIds?.length) return;
+
+    const result = {};
+    for (const id of this._hotspotIds) {
+      const node = HOTSPOT_RESOLVERS[id]?.(this);
+      if (!node) continue;
+
+      node.getWorldPosition(_hotspotWorld);
+
+      // Visibility is always probed at the node's own centre, never at the
+      // offset anchor. The offset can sit close to a neighbouring part (the
+      // barrel's front ring is right against the lens glass), and a raycast
+      // there would report the part as occluded by its own neighbour.
+      _hotspotProbe.copy(_hotspotWorld).project(this.camera);
+      const hit = this._pickNearest(_hotspotProbe.x, _hotspotProbe.y);
+      // Same ownership test the click handlers use, so a callout is hidden in
+      // exactly the cases where a click on that pixel would not register.
+      const occluded = !!hit && !hitBelongsTo(hit, node);
+
+      const offset = HOTSPOT_ANCHOR_OFFSETS[id];
+      if (offset && this.modelGroup) {
+        // Taken from the model group rather than the node, so the offset is
+        // expressed in the axes the model was authored in (+Z forward) whatever
+        // local rotation the individual part happens to carry.
+        this.modelGroup.getWorldQuaternion(_hotspotQuat);
+        this.modelGroup.getWorldScale(_hotspotScale);
+        _hotspotWorld.add(
+          _hotspotOffset
+            .copy(offset)
+            .applyQuaternion(_hotspotQuat)
+            .multiply(_hotspotScale),
+        );
+      }
+
+      const ndc = _hotspotWorld.project(this.camera);
+      // Behind the camera: project() wraps the coordinates around, which would
+      // put the anchor somewhere plausible-looking but wrong.
+      if (ndc.z > 1) continue;
+
+      result[id] = {
+        x: (ndc.x + 1) / 2,
+        y: (1 - ndc.y) / 2,
+        occluded,
+      };
+    }
+
+    this.onHotspots(result);
   }
 
   dispose() {
     this.disposed = true;
     cancelAnimationFrame(this._frameId);
+    this._resizeObserver?.disconnect();
+    this._dprQuery?.removeEventListener("change", this._handlePixelRatioChange);
     window.removeEventListener("resize", this._handleResize);
     if (this.lensCylinder) gsap.killTweensOf(this.lensCylinder.rotation);
     if (this.modeDial) gsap.killTweensOf(this.modeDial);

@@ -1,5 +1,17 @@
 export const categories = ['Urban', 'Landscape', 'Nature']
 
+// Two independent axes, on purpose:
+//
+// `shape` is layout only — the aspect the frame takes in its masonry column
+// (see WorkItem.jsx). The column packing removes the dead space that fixed rows
+// left whenever a wide frame sat beside a tall one, so what matters here is
+// that consecutive shapes differ: a run of three `portrait` in a row would
+// rebuild the uniform stack the masonry exists to break up.
+//
+// `tier` is hierarchy only — how loudly a piece is captioned, and whether it
+// gets the taller portrait treatment. Three featured works carry the section;
+// the rest support them. Keeping the two apart means a piece can be re-weighted
+// without touching the composition, and vice versa.
 export const works = [
   {
     slug: 'canal-light',
@@ -7,7 +19,8 @@ export const works = [
     location: 'Prague, Czech Republic',
     year: '2023',
     category: 'Urban',
-    size: 'large',
+    shape: 'portrait',
+    tier: 'featured',
   },
   {
     slug: 'ameyoko',
@@ -15,7 +28,8 @@ export const works = [
     location: 'Tokyo, Japan',
     year: '2024',
     category: 'Urban',
-    size: 'tall',
+    shape: 'tall',
+    tier: 'secondary',
   },
   {
     slug: 'low-tide',
@@ -23,7 +37,8 @@ export const works = [
     location: 'Lake Tahoe, USA',
     year: '2022',
     category: 'Landscape',
-    size: 'tall',
+    shape: 'landscape',
+    tier: 'secondary',
   },
   {
     slug: 'aare',
@@ -31,7 +46,8 @@ export const works = [
     location: 'Bern, Switzerland',
     year: '2023',
     category: 'Landscape',
-    size: 'large',
+    shape: 'portrait',
+    tier: 'secondary',
   },
   {
     slug: 'gold-fields',
@@ -39,7 +55,8 @@ export const works = [
     location: 'Vidzeme, Latvia',
     year: '2024',
     category: 'Nature',
-    size: 'wide',
+    shape: 'square',
+    tier: 'secondary',
   },
   {
     slug: 'bloom',
@@ -47,7 +64,8 @@ export const works = [
     location: 'Vidzeme, Latvia',
     year: '2024',
     category: 'Nature',
-    size: 'solo',
+    shape: 'tall',
+    tier: 'featured',
   },
   {
     slug: 'braies-boats',
@@ -55,7 +73,8 @@ export const works = [
     location: 'Lago di Braies, Italy',
     year: '2024',
     category: 'Landscape',
-    size: 'half',
+    shape: 'landscape',
+    tier: 'secondary',
   },
   {
     slug: 'palm-mirror',
@@ -63,7 +82,8 @@ export const works = [
     location: 'Zanzibar, Tanzania',
     year: '2023',
     category: 'Nature',
-    size: 'half',
+    shape: 'portrait',
+    tier: 'secondary',
   },
   {
     slug: 'glenfinnan',
@@ -71,7 +91,8 @@ export const works = [
     location: 'Glenfinnan, Scotland',
     year: '2024',
     category: 'Urban',
-    size: 'wide',
+    shape: 'landscape',
+    tier: 'featured',
   },
   {
     slug: 'braies-boathouse',
@@ -79,6 +100,7 @@ export const works = [
     location: 'Lago di Braies, Italy',
     year: '2024',
     category: 'Landscape',
-    size: 'wide',
+    shape: 'square',
+    tier: 'secondary',
   },
 ]

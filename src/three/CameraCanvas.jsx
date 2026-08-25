@@ -1,14 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-
-// Gate on viewport size + pointer precision at mount time: phones and coarse-pointer
-// devices skip WebGL entirely rather than getting a throttled/cropped version of it.
-function supportsHeavyMotion() {
-  if (typeof window === 'undefined') return false
-  return (
-    window.matchMedia('(min-width: 860px)').matches &&
-    window.matchMedia('(pointer: fine)').matches
-  )
-}
+import { supportsHeavyMotion } from '../lib/capabilities'
 
 export default function CameraCanvas({
   scrollProgressRef,
@@ -18,6 +9,10 @@ export default function CameraCanvas({
   onScreenEnter,
   onScreenExit,
   onShutterFire,
+  onModelReady,
+  onModelFail,
+  onHotspots,
+  hotspotTargetsRef,
 }) {
   const canvasRef = useRef(null)
   const [eligible] = useState(() => supportsHeavyMotion() && !reducedMotion)
@@ -31,19 +26,36 @@ export default function CameraCanvas({
     let cancelled = false
     let scene
 
-    import('./CameraScene').then(({ CameraScene }) => {
-      if (cancelled || !canvasRef.current) return
-      scene = new CameraScene(canvasRef.current, {
-        getScrollProgress: () => scrollProgressRef?.current ?? 0,
-        screenImages,
-        onScreenEnter,
-        onScreenExit,
-        onShutterFire,
+    import('./CameraScene')
+      .then(({ CameraScene }) => {
+        if (cancelled || !canvasRef.current) return
+        scene = new CameraScene(canvasRef.current, {
+          getScrollProgress: () => scrollProgressRef?.current ?? 0,
+          screenImages,
+          onScreenEnter,
+          onScreenExit,
+          onShutterFire,
+          onModelReady: () => !cancelled && onModelReady?.(),
+          onModelFail: () => !cancelled && onModelFail?.(),
+          onHotspots: (positions) => !cancelled && onHotspots?.(positions),
+        })
+        // Read through a ref rather than taken as a value: which parts are
+        // tracked changes on every scroll tick, and threading that through
+        // props would tear down and rebuild the whole scene each time.
+        if (hotspotTargetsRef) {
+          hotspotTargetsRef.current = (ids) => scene?.setHotspotTargets(ids)
+        }
+        window.addEventListener('pointermove', handlePointerMove)
+        window.addEventListener('click', handleClick)
+        observer.observe(canvasRef.current)
       })
-      window.addEventListener('pointermove', handlePointerMove)
-      window.addEventListener('click', handleClick)
-      observer.observe(canvasRef.current)
-    })
+      // A chunk that never downloads (offline, blocked, WebGL context refused
+      // on construction) has to report the same way a failed model load does,
+      // or Hero would sit in its pending state forever.
+      .catch((error) => {
+        console.error('[CameraCanvas] camera scene unavailable', error)
+        if (!cancelled) onModelFail?.()
+      })
 
     // Measured against the canvas's own box, not the viewport. The two are
     // only interchangeable while the Hero is pinned and the canvas happens to
@@ -114,6 +126,7 @@ export default function CameraCanvas({
 
     return () => {
       cancelled = true
+      if (hotspotTargetsRef) hotspotTargetsRef.current = null
       window.removeEventListener('pointermove', handlePointerMove)
       window.removeEventListener('click', handleClick)
       document.body.style.cursor = ''
@@ -127,6 +140,10 @@ export default function CameraCanvas({
     onScreenEnter,
     onScreenExit,
     onShutterFire,
+    onModelReady,
+    onModelFail,
+    onHotspots,
+    hotspotTargetsRef,
   ])
 
   if (!eligible) return null

@@ -79,6 +79,22 @@ export default function Lightbox({ items, activeIndex, onClose, onNavigate, redu
       if (event.key === 'Escape') onClose()
       if (event.key === 'ArrowRight') requestNavigate(1)
       if (event.key === 'ArrowLeft') requestNavigate(-1)
+      // Everything focusable behind this overlay (Nav, non-dimmed WorkItem
+      // buttons) is still in the tab order otherwise — Tab would carry a
+      // keyboard user out of the modal onto controls hidden under it.
+      if (event.key === 'Tab') {
+        const focusable = overlayRef.current?.querySelectorAll('button')
+        if (!focusable || focusable.length === 0) return
+        const first = focusable[0]
+        const last = focusable[focusable.length - 1]
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault()
+          last.focus()
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault()
+          first.focus()
+        }
+      }
     }
     window.addEventListener('keydown', handleKeydown)
     return () => window.removeEventListener('keydown', handleKeydown)
@@ -175,7 +191,7 @@ export default function Lightbox({ items, activeIndex, onClose, onNavigate, redu
         <>
           <button
             type="button"
-            className="hidden sm:flex absolute top-1/2 -translate-y-1/2 left-[clamp(8px,2vw,24px)] bg-none border border-line text-ink w-11 h-11 rounded-full cursor-pointer text-lg items-center justify-center"
+            className="flex absolute top-1/2 -translate-y-1/2 left-[clamp(8px,2vw,24px)] bg-none border border-line text-ink w-11 h-11 rounded-full cursor-pointer text-lg items-center justify-center"
             onClick={() => requestNavigate(-1)}
             aria-label="Previous photo"
           >
@@ -183,7 +199,7 @@ export default function Lightbox({ items, activeIndex, onClose, onNavigate, redu
           </button>
           <button
             type="button"
-            className="hidden sm:flex absolute top-1/2 -translate-y-1/2 right-[clamp(8px,2vw,24px)] bg-none border border-line text-ink w-11 h-11 rounded-full cursor-pointer text-lg items-center justify-center"
+            className="flex absolute top-1/2 -translate-y-1/2 right-[clamp(8px,2vw,24px)] bg-none border border-line text-ink w-11 h-11 rounded-full cursor-pointer text-lg items-center justify-center"
             onClick={() => requestNavigate(1)}
             aria-label="Next photo"
           >

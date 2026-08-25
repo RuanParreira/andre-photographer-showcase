@@ -18,10 +18,19 @@ export function scrollToSection(id, reducedMotion) {
   const target = document.getElementById(id)
   if (!target) return
 
+  // The hero is the pinned section, and resolving a pinned element's scroll
+  // position gives the END of its pin range, not the top of the page — a
+  // "back to top" click from mid-pin measured as jumping to 1980px, which is
+  // exactly the pin's own end. The top of the document is unambiguous as an
+  // absolute position, so ask for that instead of for the element.
+  const destination = id === 'hero' ? 0 : target
+
   const smoother = ScrollSmoother.get()
   if (smoother) {
-    smoother.scrollTo(target, !reducedMotion)
+    smoother.scrollTo(destination, !reducedMotion)
     pumpScrollTriggerUpdates(reducedMotion ? 100 : 1600)
+  } else if (destination === 0) {
+    window.scrollTo({ top: 0, behavior: reducedMotion ? 'auto' : 'smooth' })
   } else {
     target.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth' })
   }

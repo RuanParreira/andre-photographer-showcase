@@ -5,6 +5,7 @@ import { ScrollSmoother } from "gsap/ScrollSmoother";
 import { SplitText } from "gsap/SplitText";
 import { Flip } from "gsap/Flip";
 import { Observer } from "gsap/Observer";
+import { DrawSVGPlugin } from "gsap/DrawSVGPlugin";
 
 gsap.registerPlugin(
   useGSAP,
@@ -13,6 +14,7 @@ gsap.registerPlugin(
   SplitText,
   Flip,
   Observer,
+  DrawSVGPlugin,
 );
 
 export {
@@ -23,4 +25,5 @@ export {
   SplitText,
   Flip,
   Observer,
+  DrawSVGPlugin,
 };
