@@ -1,5 +1,9 @@
 # André — Portfolio
 
+![Preview do site](docs/preview.png)
+
+🔗 **Demo:** [ruanparreira.github.io/andre-photographer-showcase](https://ruanparreira.github.io/andre-photographer-showcase/)
+
 Site pessoal em página única (single-page) para o portfólio de fotografia do André. Seções com scroll-animations em GSAP e uma câmera 3D (Three.js) renderizada no Hero em dispositivos com boa capacidade de hardware.
 
 Este projeto é uma reconstrução de um site de portfólio mais antigo, feito quando eu estava aprendendo Tailwind CSS. A versão anterior continua disponível no GitHub como referência de evolução: [RuanParreira/PortfolioAndre](https://github.com/RuanParreira/PortfolioAndre).
